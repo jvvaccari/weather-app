@@ -5,6 +5,7 @@ import WeatherHeader from "./components/WeatherHeader";
 import BrazilianMap from "./components/BrazilianMap";
 
 import brazilIcon from "../../assets/pages/LiveWeater/icons/brasil.png";
+import { historyService, weatherService } from "../../services";
 
 const LiveWeather = () => {
   const [data, setData] = useState(null);
@@ -16,68 +17,43 @@ const LiveWeather = () => {
 
   const fetchData = async () => {
     try {
-      const [weatherRes, alertsRes] = await Promise.all([
-        fetch("http://localhost:8081/weather/data"),
-        fetch("http://localhost:8081/weather/alerts"),
+      const [weatherData, weatherAlert] = await Promise.all([
+        weatherService.getDashboardData(),
+        weatherService.getDashboardAlerts(),
       ]);
 
-      const weatherData = await weatherRes.json();
-
-      const weatherAlert =
-        alertsRes.status === 204 || !alertsRes.ok ? {} : await alertsRes.json();
-
       setData(weatherData);
-      setAlerts(weatherAlert);
+      setAlerts(weatherAlert ?? {});
       setFetchError(null);
       setLastUpdate(new Date());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      setFetchError(err.message);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Erro ao buscar dados";
+      setFetchError(message);
     }
   };
 
   const postCoordinates = async (
     latitude = -22.25,
     longitude = -42.66,
-    stateName = "Rio de Janeiro",
+    selectedStateName = "Rio de Janeiro",
   ) => {
     try {
-      const res = await fetch("http://localhost:8081/weather/coordinates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latitude, longitude }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Erro ao enviar coordenadas: ${res.status}`);
-      }
-
+      await weatherService.postCoordinates(latitude, longitude);
       await fetchData();
       setOpen(false);
-      setStateName(stateName);
+      setStateName(selectedStateName);
       setFetchError(null);
-      setLastUpdate(new Date());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      setFetchError(err.message);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Erro ao enviar coordenadas";
+      setFetchError(message);
     }
   };
 
   const dowloadHistoryWeather = async () => {
     try {
-      const response = await fetch("http://localhost:8087/history/download");
-      if (!response.ok) {
-        throw new Error("Falha ao baixar o arquivo");
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "weather-history.json";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      historyService.dowloadHistoryWeather();
     } catch (error) {
       console.error("Erro ao baixar histórico:", error);
     }
@@ -95,6 +71,7 @@ const LiveWeather = () => {
   if (fetchError) {
     console.error(fetchError);
   }
+
   return (
     <Box position={"relative"}>
       <IconButton
